@@ -1,0 +1,6 @@
+{
+  "name": "LMLA Chatbot",
+  "description": "Linguistic Multi-head Latent Attention (LMLA) wrapper for Gemini, featuring deep linguistic structuring and isotopic analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
