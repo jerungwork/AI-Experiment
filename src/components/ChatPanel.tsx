@@ -13,6 +13,8 @@ interface ChatPanelProps {
   onSelectMessage: (id: string) => void;
   inputValue: string;
   onInputChange: (val: string) => void;
+  rateLimitError?: string | null;
+  retryTimer?: number;
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -24,9 +26,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onSelectMessage,
   inputValue,
   onInputChange,
+  rateLimitError,
+  retryTimer = 0,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Simple token estimator: ~4 chars per token
+  const estimatedTokens = Math.ceil(inputValue.length / 4);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -43,7 +50,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   }, [messages]);
 
   const handleSend = () => {
-    if (inputValue.trim() && !isProcessing) {
+    if (inputValue.trim() && !rateLimitError) {
       onSendMessage(inputValue);
     }
   };
@@ -79,7 +86,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar relative">
+        <AnimatePresence>
+          {rateLimitError && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="sticky top-0 z-50 bg-rose-50 border border-rose-100 rounded-lg p-3 shadow-md flex items-center gap-3 backdrop-blur-sm"
+            >
+              <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs font-bold text-rose-700 uppercase tracking-tighter">API Rate Limit Threshold Reached</p>
+                <p className="text-[10px] text-rose-600 font-medium">Excessive token density detected in latent space. Resetting buffers.</p>
+              </div>
+              <div className="bg-rose-500 text-white px-2 py-1 rounded font-mono text-xs font-bold ring-2 ring-rose-200">
+                {retryTimer}s
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-slate-300 space-y-4">
             <Network className="w-12 h-12 opacity-40" />
@@ -114,27 +141,38 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               {msg.role === 'user' ? 'USER / DECODING' : 'LMLA-ENCODED RESPONSE'}
             </span>
             {msg.status === 'error' && (
-              <div className="mx-2 mt-1 flex items-center gap-1.5 text-rose-500 text-[10px] font-bold uppercase">
+              <div className="mx-2 mt-1 flex items-center gap-1.5 text-rose-500 text-[10px] font-bold uppercase tracking-tighter">
                 <AlertCircle className="w-3 h-3" />
-                Processing_Fail
+                Interrupted_by_User_Seq
               </div>
             )}
           </motion.div>
         ))}
       </div>
 
-      <div className="p-4 border-t border-slate-100 bg-slate-50">
+      <div className="p-4 border-t border-slate-100 bg-slate-50 relative">
+        {rateLimitError && (
+          <div className="absolute inset-x-0 -top-6 flex justify-center">
+            <div className="bg-rose-500 text-white text-[9px] font-bold px-3 py-1 rounded-t-lg shadow-sm font-mono uppercase tracking-widest">
+              Try again in {retryTimer}s
+            </div>
+          </div>
+        )}
         <div className="relative flex flex-col group">
           <textarea
             ref={textareaRef}
             value={inputValue}
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type to structure via LMLA..."
-            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm shadow-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none transition-all placeholder:text-slate-400"
+            placeholder={rateLimitError ? "System locked..." : "Type to structure via LMLA..."}
+            disabled={!!rateLimitError}
+            className={`w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm shadow-sm focus:ring-1 focus:ring-accent focus:border-accent outline-none resize-none transition-all placeholder:text-slate-400 ${rateLimitError ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
             rows={1}
           />
-          <div className="absolute right-3 bottom-3 flex items-center gap-2">
+          <div className="absolute right-3 bottom-1.5 flex items-center gap-2">
+             <div className="text-[10px] font-mono text-slate-300 mr-2 uppercase tracking-tighter">
+               {estimatedTokens} Tokens
+             </div>
              {isProcessing ? (
                <button
                  onClick={onStop}
@@ -146,7 +184,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
              ) : (
                <button
                  onClick={handleSend}
-                 disabled={!inputValue.trim()}
+                 disabled={!inputValue.trim() || !!rateLimitError}
                  className="text-xs font-bold text-accent uppercase tracking-widest disabled:opacity-30 hover:opacity-80 transition-opacity p-2"
                >
                  SEND
@@ -154,20 +192,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
              )}
           </div>
         </div>
-        <p className="mt-2 px-1 text-[10px] text-slate-400 font-medium">
-          MLA Layer: 6-Variable Isotopic Structure Active
-        </p>
+        <div className="flex justify-between items-center mt-2 px-1">
+          <p className="text-[10px] text-slate-400 font-medium">
+            MLA Layer: 6-Variable Isotopic Structure Active
+          </p>
+          <div className="flex gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          </div>
+        </div>
       </div>
 
       <footer className="h-8 bg-slate-900 text-white flex items-center px-6 justify-between shrink-0">
         <div className="flex gap-4 items-center">
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isProcessing ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-400'}`}></div>
-            <span className="text-[10px] font-mono uppercase tracking-widest">KV_CACHE_LMLA: {isProcessing ? 'SYNCING' : 'OK'}</span>
+            <div className={`w-2 h-2 rounded-full ${rateLimitError ? 'bg-rose-500' : isProcessing ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-400'}`}></div>
+            <span className="text-[10px] font-mono uppercase tracking-widest">KV_CACHE_LMLA: {rateLimitError ? 'EXCEEDED' : isProcessing ? 'SYNCING' : 'OK'}</span>
           </div>
         </div>
         <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
-          MLA LATENT ATTENTION MODULE // 0.04ms DECODE
+           LATENT_TOKENS: {estimatedTokens.toString().padStart(6, '0')} // DECODE_DELAY: 0.04ms
         </div>
       </footer>
     </div>
