@@ -86,8 +86,17 @@ export const lmlaService = {
            - W (Granularity/Importance): Relative importance to the overall picture (0.0 to 1.0).
         3. For each sentence, extract the 6 variables simultaneously:
            [1] Subject, [2] Action, [3] Object, [4] Result, [5] Pre-condition, [6] Situation.
-        4. ONLY if absolutely necessary to decode conceptual/abstract imagery, add one Metaphor and one Cross-Topic label per variable.
-           Do NOT use these for straightforward literal data.
+        4. MATH EXCEPTION: If the input is a pure math question (e.g. "2+2"):
+           - Subject: "[the equation] (math)" (e.g. "2+2 (math)")
+           - Action: "calculate math"
+           - Object/Result/Pre-condition/Situation: "null"
+        5. PHATIC EXCEPTION: If the input is a greeting or pure phatic expression (e.g. "Hello", "Hi"):
+           - Subject: "[the greeting] (phatic)" (e.g. "Hello (phatic)")
+           - Action: "greeting"
+           - Object/Result/Pre-condition/Situation: "null"
+        6. ONLY if absolutely necessary to decode conceptual/abstract imagery, add one Metaphor and one Cross-Topic label per variable.
+           - For nonsensical words (e.g. "afafa"), use Metaphor to flag it as "not a real word/undefined".
+           - For simple greetings or math, do NOT use metaphors.
         
         Text: "${text}"`,
         config: {
@@ -110,7 +119,20 @@ export const lmlaService = {
         model: "gemini-3.1-pro-preview",
         contents: `You are the LMLA Reasoner. Based on this structured input blueprint, generate a RESPONSE BLUEPRINT.
         Always answer what is asked only. Don't explain unnecessary topics.
-        Provide at most 3 suggestions.
+        
+        SUGGESTIONS RULE:
+        - Provide UP TO 3 suggestions ONLY if there is clear conceptual space for further inquiry.
+        - For simple greetings ("Hello", "Hi"), direct math ("2+2"), or nonsensical input ("afafa"), provide ZERO suggestions.
+        
+        MATH RULE:
+        - If Input Subject contains "(math)", the response blueprint should contain the calculation steps.
+        - Each step should be in its own isotopic break if complex, or just the final answer if simple (e.g. 2+2 = 4).
+        - For simple math, just 1 line (e.g. "4").
+        
+        PHATIC RULE:
+        - If Input Subject contains "(phatic)", provide a short, polite, and mannered response.
+        - Do not provide suggestions for phatic inputs.
+        
         Use the same LMLA structure for your response.
         
         Note: The response blueprint IS the "Linguistic Truth". Do NOT add metaphors or cross-topics to the output variables, as the blueprint state is already decoded.
@@ -138,10 +160,12 @@ export const lmlaService = {
         
         Rules:
         1. Preserve the underlying truth of the blueprint.
-        2. Generate the main response sentences. Put a line-break after each sentence.
-        3. After the main response is complete, add an empty line.
-        4. If relevant, add the exact phrase: "Next, would you like to explore :" followed by an empty line.
-        5. Provide exactly 1-3 suggestions.
+        2. MATH EXCEPTION: If the blueprint contains math results or steps (subject contains "(math)"), output them purely and concisely. For simple math like "2+2", output exactly only the result (e.g. "4").
+        3. PHATIC EXCEPTION: If the blueprint is phatic (subject contains "(phatic)"), output a short, polite, mannered greeting.
+        4. Generate the main response sentences. Put a line-break after each sentence.
+        5. After the main response is complete, add an empty line.
+        4. ONLY IF suggestions are provided in the blueprint, add the exact phrase: "Next, would you like to explore :" followed by an empty line.
+        5. Provide the suggestions exactly as listed in the blueprint (max 3).
         6. Each suggestion MUST be followed by an empty line (Start New Line after the text, then another Start New Line).
         7. Suggestions must use this exact format:
            [1] Suggestion text

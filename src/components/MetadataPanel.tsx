@@ -84,14 +84,38 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({ metadata, blueprin
 
               {/* TOP: Structure/Blueprint (6 Variables) */}
               <div className="space-y-2">
-                <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Linguistic Blueprint</span>
+                <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">
+                  {br.variables.subject.value.toLowerCase().includes('(math)') ? 'Calculation Breakdown' : 
+                   br.variables.subject.value.toLowerCase().includes('(phatic)') ? 'Phatic Exchange' :
+                   'Linguistic Blueprint'}
+                </span>
                 <div className="flex flex-col gap-2 bg-slate-900 p-3 rounded-lg border border-slate-800 shadow-inner">
-                  <BlueprintItem label="S" valueObj={br.variables.subject} />
-                  <BlueprintItem label="A" valueObj={br.variables.action} />
-                  <BlueprintItem label="O" valueObj={br.variables.object} />
-                  <BlueprintItem label="R" valueObj={br.variables.result} />
-                  <BlueprintItem label="C" valueObj={br.variables.preCondition} />
-                  <BlueprintItem label="E" valueObj={br.variables.situation} />
+                  {br.variables.subject.value.toLowerCase().includes('(math)') || br.variables.subject.value.toLowerCase().includes('(phatic)') ? (
+                    <>
+                      {Object.values(br.variables).map((v, i) => {
+                        const val = v as { value: string };
+                        if (val.value && val.value !== 'null' && val.value !== 'N/A') {
+                          return (
+                            <div key={i} className="flex items-center gap-2 border-b border-white/5 pb-1 last:border-0 last:pb-0">
+                              <span className="text-[10px] font-mono text-amber-400 italic leading-tight">
+                                {val.value}
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      <BlueprintItem label="S" valueObj={br.variables.subject} />
+                      <BlueprintItem label="A" valueObj={br.variables.action} />
+                      <BlueprintItem label="O" valueObj={br.variables.object} />
+                      <BlueprintItem label="R" valueObj={br.variables.result} />
+                      <BlueprintItem label="C" valueObj={br.variables.preCondition} />
+                      <BlueprintItem label="E" valueObj={br.variables.situation} />
+                    </>
+                  )}
                 </div>
               </div>
 
